@@ -37,7 +37,7 @@ export default function Thread_Dashboard() {
     const fetchSavedData = async () => {
       try {
         const response = await axios.get(
-          "http://127.0.0.1:5000/fetch_saved_data"
+          "http://threadpybackend-production.up.railway.app/fetch_saved_data"
         );
 
         console.log("Backend response:", response.data);
@@ -105,7 +105,7 @@ export default function Thread_Dashboard() {
       formData.append("invoice", invoiceFile); // <-- And this
 
       const response = await axios.post(
-        "http://127.0.0.1:5000/upload_Dashboard",
+        "http://threadpybackend-production.up.railway.app/upload_Dashboard",
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
@@ -123,9 +123,13 @@ export default function Thread_Dashboard() {
   const exportData1 = async () => {
     try {
       setIsLoading(true);
-      const response = await axios.post("http://127.0.0.1:5000/export", data, {
-        responseType: "blob",
-      });
+      const response = await axios.post(
+        "http://threadpybackend-production.up.railway.app/export",
+        data,
+        {
+          responseType: "blob",
+        }
+      );
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
