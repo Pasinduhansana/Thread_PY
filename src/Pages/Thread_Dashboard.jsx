@@ -350,7 +350,7 @@ export default function Thread_Dashboard() {
         </div>
 
         {/* Content Area */}
-        <div className="px-4 h-full overflow-y-auto">
+        <div className="px-4 w-full h-full overflow-y-auto">
           {isLoadingSavedData ? (
             <div className="flex justify-center items-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#dab6fc]"></div>

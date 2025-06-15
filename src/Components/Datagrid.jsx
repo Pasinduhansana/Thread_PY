@@ -330,7 +330,7 @@ const DataGrid = ({ data, allowSelection = true }) => {
   };
 
   return (
-    <div className="p-5 min-h-screen w-full">
+    <div className="pt-3 min-h-screen w-full">
       {/* Search and Actions Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-5">
         <div className="relative w-full sm:w-2/3 max-w-xl">
