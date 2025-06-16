@@ -117,6 +117,82 @@ const DataGrid = ({ data, allowSelection = true }) => {
     const template = EMAIL_TEMPLATES[selectedTemplate];
     const subject = template.subject;
 
+    let body = `<p>${template.greeting}</p>`;
+    body += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
+    body += `
+    <thead>
+      <tr>
+        <th>PO No</th>
+        <th>Sub Category</th>
+        <th>Total PO Qty</th>
+        <th>Total Received Qty</th>
+        <th>Balance to Receive Qty</th>
+        <th>Ship to Location</th>
+      </tr>
+    </thead>
+    <tbody>
+  `;
+
+    dataToEmail.forEach((row) => {
+      body += `
+      <tr>
+        <td>${row.RMPONo}</td>
+        <td>${row["Article Sub Category"]}</td>
+        <td>${row["Total PO Qty"]}</td>
+        <td>${row["Total Received Qty"]}</td>
+        <td>${row["Balance to Receive Qty"]}</td>
+        <td>${row["Ship to Location"]}</td>
+      </tr>
+    `;
+
+      if (row.articles && row.articles.length) {
+        body += `
+        <tr>
+          <td colspan="6">
+            <strong>Article Details:</strong>
+            <table border="1" style="border-collapse: collapse; width: 100%;">
+              <thead>
+                <tr>
+                  <th>Article Code</th>
+                  <th>Article Name</th>
+                  <th>Color Name</th>
+                  <th>Color Code</th>
+                  <th>Ordered Qty</th>
+                  <th>Received Qty</th>
+                  <th>Invoice</th>
+                  <th>Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+        row.articles.forEach((article) => {
+          body += `
+          <tr>
+            <td>${article["Article Code"]}</td>
+            <td>${article["Article Name"]}</td>
+            <td>${article["Color Name"]}</td>
+            <td>${article["Color Code"]}</td>
+            <td>${article["PO Qty(Purchase UOM)"]}</td>
+            <td>${article["Received Qty"]}</td>
+            <td>${article["Billing Doc. No"] || "N/A"}</td>
+            <td>${article["Qty"] || "N/A"}</td>
+          </tr>
+        `;
+        });
+
+        body += `
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      `;
+      }
+    });
+
+    body += `</tbody></table>`;
+    body += `<p>${template.closing}</p>`;
+    /*
     let body = template.greeting + "\n\n";
 
     dataToEmail.forEach((row) => {
@@ -146,34 +222,41 @@ const DataGrid = ({ data, allowSelection = true }) => {
     });
 
     body += template.closing;
-
+*/
     // Use the custom recipient if provided, otherwise use default
     const to = customRecipient || "sashini@coats.com";
     const cc = "sahansu@inqube.com";
 
-    try {
-      // Method 1: Try mailto (works in most browsers with default mail client)
-      const mailtoLink = `mailto:${to}?cc=${cc}&subject=${encodeURIComponent(
-        subject
-      )}&body=${encodeURIComponent(body)}`;
+    // try {
+    //   // Method 1: Try mailto (works in most browsers with default mail client)
+    //   const mailtoLink = `mailto:${to}?cc=${cc}&subject=${encodeURIComponent(
+    //     subject
+    //   )}&body=${encodeURIComponent(body)}`;
 
-      // Create hidden anchor and click it (more reliable than window.open for mailto)
-      const link = document.createElement("a");
-      link.href = mailtoLink;
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    //   window.location.href = mailtoLink;
 
-      // Close modal
-      setShowEmailModal(false);
-    } catch (error) {
-      console.error("Failed to open email client:", error);
-      alert(
-        "Could not open your email client automatically. Please copy the email details and send manually."
-      );
-    }
+    //   // Create hidden anchor and click it (more reliable than window.open for mailto)
+    //   const link = document.createElement("a");
+    //   link.href = mailtoLink;
+    //   link.style.display = "none";
+    //   document.body.appendChild(link);
+    //   link.click();
+    //   document.body.removeChild(link);
 
+    //   // Close modal
+    //   setShowEmailModal(false);
+    // } catch (error) {
+    //   console.error("Failed to open email client:", error);
+    //   alert(
+    //     "Could not open your email client automatically. Please copy the email details and send manually."
+    //   );
+    //}
+    const mailtoLink = `mailto:${to}?cc=${cc}&subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+
+    // Open desktop Outlook
+    window.location.href = mailtoLink;
     // Close modal
     setShowEmailModal(false);
   };
@@ -1084,35 +1167,81 @@ const DataGrid = ({ data, allowSelection = true }) => {
                         )
                       : filteredDataWithFilters;
 
-                    let body = template.greeting + "\n\n";
+                    let body = `<p>${template.greeting}</p>`;
+                    body += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
+                    body += `
+    <thead>
+      <tr>
+        <th>PO No</th>
+        <th>Sub Category</th>
+        <th>Total PO Qty</th>
+        <th>Total Received Qty</th>
+        <th>Balance to Receive Qty</th>
+        <th>Ship to Location</th>
+      </tr>
+    </thead>
+    <tbody>
+  `;
 
                     dataToEmail.forEach((row) => {
-                      body += `PO No: ${row.RMPONo}\n`;
-                      body += `Sub Category: ${row["Article Sub Category"]}\n`;
-                      body += `Total PO Qty: ${row["Total PO Qty"]}\n`;
-                      body += `Total Received Qty: ${row["Total Received Qty"]}\n`;
-                      body += `Balance to Receive Qty: ${row["Balance to Receive Qty"]}\n`;
-                      body += `Ship to Location: ${row["Ship to Location"]}\n\n`;
+                      body += `
+      <tr>
+        <td>${row.RMPONo}</td>
+        <td>${row["Article Sub Category"]}</td>
+        <td>${row["Total PO Qty"]}</td>
+        <td>${row["Total Received Qty"]}</td>
+        <td>${row["Balance to Receive Qty"]}</td>
+        <td>${row["Ship to Location"]}</td>
+      </tr>
+    `;
 
                       if (row.articles && row.articles.length) {
-                        body += "Article Details:\n";
-                        row.articles.forEach((article, idx) => {
-                          body += `${idx + 1}. Code: ${
-                            article["Article Code"]
-                          }, Name: ${article["Article Name"]}\n`;
-                          body += `   Color: ${article["Color Name"]} (${article["Color Code"]})\n`;
-                          body += `   Ordered: ${article["PO Qty(Purchase UOM)"]}, Received: ${article["Received Qty"]}\n`;
-                          if (article["Billing Doc. No"]) {
-                            body += `   Invoice: ${article["Billing Doc. No"]}, Qty: ${article["Qty"]}\n`;
-                          }
-                          body += "\n";
-                        });
-                      }
+                        body += `
+        <tr>
+          <td colspan="6">
+            <strong>Article Details:</strong>
+            <table border="1" style="border-collapse: collapse; width: 100%;">
+              <thead>
+                <tr>
+                  <th>Article Code</th>
+                  <th>Article Name</th>
+                  <th>Color Name</th>
+                  <th>Color Code</th>
+                  <th>Ordered Qty</th>
+                  <th>Received Qty</th>
+                  <th>Invoice</th>
+                  <th>Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
 
-                      body += "------------------------\n\n";
+                        row.articles.forEach((article) => {
+                          body += `
+          <tr>
+            <td>${article["Article Code"]}</td>
+            <td>${article["Article Name"]}</td>
+            <td>${article["Color Name"]}</td>
+            <td>${article["Color Code"]}</td>
+            <td>${article["PO Qty(Purchase UOM)"]}</td>
+            <td>${article["Received Qty"]}</td>
+            <td>${article["Billing Doc. No"] || "N/A"}</td>
+            <td>${article["Qty"] || "N/A"}</td>
+          </tr>
+        `;
+                        });
+
+                        body += `
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      `;
+                      }
                     });
 
-                    body += template.closing;
+                    body += `</tbody></table>`;
+                    body += `<p>${template.closing}</p>`;
 
                     // Copy email details to clipboard
                     const emailDetails = `To: ${customRecipient}\nCC: SahanSu@inqube.com\nSubject: ${subject}\n\n${body}`;
