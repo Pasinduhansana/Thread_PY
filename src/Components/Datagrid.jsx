@@ -41,8 +41,8 @@ const EMAIL_TEMPLATES = {
   delivery_change: {
     subject: "Delivery Location Change: IGL Thread Orders",
     greeting:
-      "Hi Sashini,\n\nWe are required to change the following orders delviery location as below.",
-    closing: "\nPlease let us know the confirmatin after the location change",
+      "Hi Sashini,\n\nWe are required to change the following orders delivery location as below.",
+    closing: "\nPlease let us know the confirmation after the location change",
   },
 };
 
