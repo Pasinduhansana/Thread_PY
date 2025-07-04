@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import DataGrid from "../Components/Datagrid";
+import { PriorityContext } from "../Data/PriorityOrders";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaFileUpload,
@@ -15,6 +16,7 @@ import {
   FaDatabase,
 } from "react-icons/fa";
 import ExportModel from "../Components/ExportModel";
+import { apiUrl } from "../Data/config";
 
 export default function Thread_Dashboard() {
   const [data, setData] = useState([]);
@@ -22,11 +24,17 @@ export default function Thread_Dashboard() {
   const [invoiceFileName, setInvoiceFileName] = useState("");
   const [kpiFile, setKpiFile] = useState(null);
   const [invoiceFile, setInvoiceFile] = useState(null);
+  const [orderbookfile, setorderbookfile] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [lastUploadedDate, setLastUploadedDate] = useState("");
   const [isLoadingSavedData, setIsLoadingSavedData] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [pcdFileName, setPcdFileName] = useState("");
+  const [pcdFile, setPcdFile] = useState(null);
+  const [coatsorderbookFileName, setcoatsorderbookFileName] = useState(null);
+  const [pcdLastUpdated, setPcdLastUpdated] = useState("");
+  const [orderbookLastUpdated, setOrderbookLastUpdated] = useState("");
 
   const handleExportClick = () => {
     setShowExportModal(true); // Open the export modal
@@ -36,9 +44,7 @@ export default function Thread_Dashboard() {
   useEffect(() => {
     const fetchSavedData = async () => {
       try {
-        const response = await axios.get(
-          "https://threadpybackend-production.up.railway.app/fetch_saved_data"
-        );
+        const response = await axios.get(`${apiUrl}/fetch_saved_data`);
 
         console.log("Backend response:", response.data);
 
@@ -57,8 +63,45 @@ export default function Thread_Dashboard() {
       }
     };
 
+    const fetchPcdLastUpdated = async () => {
+      try {
+        const response = await axios.get(`${apiUrl}/get_pcd_last_updated`);
+        setPcdLastUpdated(response.data.last_updated || "");
+      } catch (error) {
+        setPcdLastUpdated("");
+      }
+    };
+
+    const fetchOrderbookLastUpdated = async () => {
+      try {
+        const response = await axios.get(
+          `${apiUrl}/get_orderbook_last_updated`
+        );
+        setOrderbookLastUpdated(response.data.last_updated || "");
+      } catch (error) {
+        setOrderbookLastUpdated("");
+      }
+    };
+
+    fetchOrderbookLastUpdated();
+    fetchPcdLastUpdated();
     fetchSavedData();
   }, []);
+
+  // PCD Dropzone
+  const { getRootProps: getPcdRootProps, getInputProps: getPcdInputProps } =
+    useDropzone({
+      accept: {
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+          ".xlsx",
+        ],
+        "application/vnd.ms-excel": [".xls"],
+      },
+      onDrop: async (acceptedFiles) => {
+        setPcdFile(acceptedFiles[0]);
+        setPcdFileName(acceptedFiles[0].name);
+      },
+    });
 
   // KPI Report Dropzone
   const { getRootProps: getKpiRootProps, getInputProps: getKpiInputProps } =
@@ -96,6 +139,25 @@ export default function Thread_Dashboard() {
     },
   });
 
+  // Orderbook Report Dropzone
+  const {
+    getRootProps: getcoatsorderbookRootProps,
+    getInputProps: getcoatsorderbookInputProps,
+  } = useDropzone({
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+        ".xlsx",
+      ],
+      "application/vnd.ms-excel": [".xls"],
+    },
+    onDrop: async (acceptedFiles) => {
+      const formData = new FormData();
+      formData.append("file", acceptedFiles[0]);
+      setcoatsorderbookFileName(acceptedFiles[0].name);
+      setorderbookfile(acceptedFiles[0]);
+    },
+  });
+
   const Fetch_Data = async () => {
     try {
       console.log("Fetching data...");
@@ -103,9 +165,10 @@ export default function Thread_Dashboard() {
       const formData = new FormData();
       formData.append("kpi", kpiFile); // <-- Add this
       formData.append("invoice", invoiceFile); // <-- And this
+      formData.append("pcd", pcdFile);
 
       const response = await axios.post(
-        "https://threadpybackend-production.up.railway.app/upload_Dashboard",
+        `${apiUrl}/upload_Dashboard`,
         formData,
         {
           headers: { "Content-Type": "multipart/form-data" },
@@ -113,29 +176,6 @@ export default function Thread_Dashboard() {
       );
       setData(response.data);
       setLastUploadedDate(new Date().toLocaleString());
-    } catch (error) {
-      console.error("Error exporting file:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const exportData1 = async () => {
-    try {
-      setIsLoading(true);
-      const response = await axios.post(
-        "https://threadpybackend-production.up.railway.app/export",
-        data,
-        {
-          responseType: "blob",
-        }
-      );
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "processed_output.xlsx");
-      document.body.appendChild(link);
-      link.click();
     } catch (error) {
       console.error("Error exporting file:", error);
     } finally {
@@ -196,17 +236,51 @@ export default function Thread_Dashboard() {
     setShowExportModal(false);
   };
 
+  const handleUploadPcd = async () => {
+    if (!pcdFile) return;
+    const formData = new FormData();
+    formData.append("pcd", pcdFile);
+    try {
+      const response = await axios.post(`${apiUrl}/upload_pcd`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setPcdLastUpdated(response.data.last_updated);
+      alert("PCD file uploaded successfully!");
+    } catch (error) {
+      alert("Failed to upload PCD file.");
+    }
+  };
+
+  const handleUploadOrderbook = async () => {
+    if (!orderbookfile) return;
+    const formData = new FormData();
+    formData.append("orderbook", orderbookfile);
+    try {
+      const response = await axios.post(
+        `${apiUrl}/upload_orderbook`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
+      setOrderbookLastUpdated(response.data.last_updated);
+      alert("Orderbook file uploaded successfully!");
+    } catch (error) {
+      alert("Failed to upload Orderbook file.");
+    }
+  };
+
   return (
     <div className="flex h-screen w-full ">
       {/* Side Menu Toggle Button */}
       <div
         className={`${
           menuOpen ? "ml-64" : ""
-        } fixed top-4 left-0 z-20 transition-all duration-300`}
+        } fixed top-0 left-0 z-20 transition-all duration-300`}
       >
         <button
           onClick={() => setMenuOpen(!menuOpen)}
-          className="bg-[#696fcf] hover:bg-[#856ed2] text-white rounded-r-lg p-2 shadow-md flex items-center justify-center"
+          className="bg-[#696fcf] mt-22 hover:bg-[#856ed2] text-white rounded-r-lg p-2 shadow-md flex items-center justify-center"
           aria-label="Toggle menu"
         >
           {menuOpen ? (
@@ -278,6 +352,72 @@ export default function Thread_Dashboard() {
               </div>
             </div>
 
+            {/* PCD Report Upload */}
+            <div className="space-y-2 mt-6">
+              <label className="block text-xs font-medium text-gray-700">
+                PCD Update
+              </label>
+              <div
+                {...getPcdRootProps()}
+                className="border-2 border-dashed border-[#bbadff] rounded-lg p-3 bg-[#f4f3f5] hover:bg-[#f5f0f9] transition-colors cursor-pointer"
+              >
+                <input {...getPcdInputProps()} />
+                <div className="flex flex-col items-center justify-center text-center">
+                  <p className="text-xs text-[#7851dc] font-medium truncate w-full">
+                    {pcdFileName
+                      ? pcdFileName
+                      : "Drop or select PCD Update file"}
+                  </p>
+                </div>
+              </div>
+              {pcdFileName && (
+                <button
+                  onClick={handleUploadPcd}
+                  className="mt-2 px-4 py-1 bg-[#7851dc] text-white rounded text-xs"
+                >
+                  Upload PCD
+                </button>
+              )}
+              {pcdLastUpdated && (
+                <p className="text-[10px] text-green-600 mt-1">
+                  Last updated: {pcdLastUpdated}
+                </p>
+              )}
+            </div>
+
+            {/* Supplier Ex-Mill File Upload */}
+            <div className="space-y-2 mt-6">
+              <label className="block text-xs font-medium text-gray-700">
+                Coats Orderbook Update
+              </label>
+              <div
+                {...getcoatsorderbookRootProps()}
+                className="border-2 border-dashed border-[#bbadff] rounded-lg p-3 bg-[#f4f3f5] hover:bg-[#f5f0f9] transition-colors cursor-pointer"
+              >
+                <input {...getcoatsorderbookInputProps()} />
+                <div className="flex flex-col items-center justify-center text-center">
+                  <p className="text-xs text-[#7851dc] font-medium truncate w-full">
+                    {coatsorderbookFileName
+                      ? coatsorderbookFileName
+                      : "Drop or select Coats orderbook file"}
+                  </p>
+                </div>
+              </div>
+              {coatsorderbookFileName && (
+                <button
+                  onClick={handleUploadOrderbook}
+                  className="mt-2 px-4 py-1 bg-[#7851dc] text-white rounded text-xs"
+                >
+                  Upload Coats Orderbook
+                </button>
+              )}
+              {orderbookLastUpdated && (
+                <p className="text-[10px] text-green-600 mt-1">
+                  Last updated: {orderbookLastUpdated}
+                </p>
+              )}
+            </div>
+
             {/* Action Buttons */}
             <div className="pt-4 space-y-2">
               <motion.button
@@ -296,7 +436,7 @@ export default function Thread_Dashboard() {
                   </div>
                 ) : (
                   <>
-                    <FaDatabase className="h-3 w-3" /> Fetch Data
+                    <FaDatabase className="h-3 w-3" /> Sync Data
                   </>
                 )}
               </motion.button>
@@ -328,20 +468,12 @@ export default function Thread_Dashboard() {
 
       {/* Main Content Area */}
       <div
-        className={`flex-1  transition-all duration-300 ${
+        className={`flex-1  -mt-5 transition-all duration-300 ${
           menuOpen ? "ml-64" : "ml-0"
         }`}
       >
         {/* Header */}
-        <div className="px-4 display flex flex-row gap-0 justify-between text-left">
-          <div className="flex flex-col gap-0 mb-2 justify-baseline text-left">
-            <h1 className="text-[20px] font-semibold text-gray-800">
-              Thread Dashboard
-            </h1>
-            <p className="text-sm font-normal text-gray-400">
-              Analize the thread data and generate insights.
-            </p>
-          </div>
+        <div className="px-10 display flex flex-row gap-0 justify-between text-left">
           {lastUploadedDate && (
             <p className="text-xs text-gray-500 mt-2">
               Last Uploaded: {lastUploadedDate}
@@ -350,7 +482,7 @@ export default function Thread_Dashboard() {
         </div>
 
         {/* Content Area */}
-        <div className="px-4 w-full h-full overflow-y-auto">
+        <div className="px-4 h-full overflow-y-auto">
           {isLoadingSavedData ? (
             <div className="flex justify-center items-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#dab6fc]"></div>

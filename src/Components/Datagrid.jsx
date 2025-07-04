@@ -38,6 +38,12 @@ const EMAIL_TEMPLATES = {
     closing:
       "\nThese orders are critical for our production schedule. Please advise on when we can expect delivery.\n\nThank you,\nProcurement Team",
   },
+  delivery_change: {
+    subject: "Delivery Location Change: IGL Thread Orders",
+    greeting:
+      "Hi Sashini,\n\nWe are required to change the following orders delivery location as below.",
+    closing: "\nPlease let us know the confirmation after the location change",
+  },
 };
 
 const groupDataByPO = (data) => {
@@ -58,6 +64,8 @@ const groupDataByPO = (data) => {
         "Balance to Receive Qty": roundUp(row["Balance to Receive Qty"]),
         Qty: row["Qty"],
         "Ship to Location": row["Ship to Location"],
+        "Earliest PCD": row["Earliest PCD"],
+        "Earliest PSD": row["Earliest PSD"],
         articles: [],
       };
     } else {
@@ -71,6 +79,22 @@ const groupDataByPO = (data) => {
         grouped[poNo]["Balance to Receive Qty"] + row["Balance to Receive Qty"]
       );
       grouped[poNo]["Qty"] = roundUp(grouped[poNo]["Qty"] + row["Qty"]);
+      if (
+        row["Earliest PCD"] &&
+        (!grouped[poNo]["Earliest PCD"] ||
+          new Date(row["Earliest PCD"]) <
+            new Date(grouped[poNo]["Earliest PCD"]))
+      ) {
+        grouped[poNo]["Earliest PCD"] = row["Earliest PCD"];
+      }
+      if (
+        row["Earliest PSD"] &&
+        (!grouped[poNo]["Earliest PSD"] ||
+          new Date(row["Earliest PSD"]) <
+            new Date(grouped[poNo]["Earliest PSD"]))
+      ) {
+        grouped[poNo]["Earliest PSD"] = row["Earliest PSD"];
+      }
     }
 
     grouped[poNo].articles.push({
@@ -83,6 +107,8 @@ const groupDataByPO = (data) => {
       "Balance to Receive Qty": roundUp(row["Balance to Receive Qty"]),
       "Billing Doc. No": row["Billing Doc. No"],
       Qty: roundUp(row["Qty"]),
+      "Earliest PCD": row["Earliest PCD"],
+      "Earliest PSD": row["Earliest PSD"],
     });
   });
 
@@ -95,7 +121,8 @@ const DataGrid = ({ data, allowSelection = true }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("grid"); // Add state for tab view: 'card' or 'grid'
   const [selectedRows, setSelectedRows] = useState({});
-  const { priorityPOs } = useContext(PriorityContext);
+  const { priorityPOs, addToPriority, removeFromPriority } =
+    useContext(PriorityContext);
   const isPriority = (poNo) =>
     priorityPOs && priorityPOs.some((po) => po.RMPONo === poNo);
   const [selectAll, setSelectAll] = useState(false);
@@ -104,6 +131,10 @@ const DataGrid = ({ data, allowSelection = true }) => {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("urgent");
   const [customRecipient, setCustomRecipient] = useState("");
+  const [showOnlyPriority, setShowOnlyPriority] = useState(false);
+  const [emailGrouping, setEmailGrouping] = useState("po");
+  const [onlyPending, setOnlyPending] = useState(false);
+  //console.log("Priority Orders:", priorityPOs);
   //const { priorityPOs, addToPriority, removeFromPriority } =
   //useContext(PriorityContext);
   //const isPriority = (poNo) => priorityPOs.some((po) => po.RMPONo === poNo);
@@ -117,147 +148,147 @@ const DataGrid = ({ data, allowSelection = true }) => {
     const template = EMAIL_TEMPLATES[selectedTemplate];
     const subject = template.subject;
 
-    let body = `<p>${template.greeting}</p>`;
-    body += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
-    body += `
-    <thead>
-      <tr>
-        <th>PO No</th>
-        <th>Sub Category</th>
-        <th>Total PO Qty</th>
-        <th>Total Received Qty</th>
-        <th>Balance to Receive Qty</th>
-        <th>Ship to Location</th>
-      </tr>
-    </thead>
-    <tbody>
-  `;
+    let body = template.greeting + "\n\n";
 
-    dataToEmail.forEach((row) => {
+    // Replace this plain text formatting with HTML tables
+    if (emailGrouping === "po") {
+      // PO Level - HTML Table
       body += `
-      <tr>
-        <td>${row.RMPONo}</td>
-        <td>${row["Article Sub Category"]}</td>
-        <td>${row["Total PO Qty"]}</td>
-        <td>${row["Total Received Qty"]}</td>
-        <td>${row["Balance to Receive Qty"]}</td>
-        <td>${row["Ship to Location"]}</td>
-      </tr>
-    `;
-
-      if (row.articles && row.articles.length) {
+        <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; font-family: Arial, sans-serif;">
+          <thead>
+            <tr style="background-color: #696fcf; color: white;">
+              <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">PO No</th>
+              <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Sub Category</th>
+              <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Total PO Qty</th>
+              <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Received Qty</th>
+              <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Balance</th>
+              <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Ship to Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${dataToEmail
+              .map(
+                (row) => `
+              <tr style="background-color: ${
+                isPriority(row.RMPONo) ? "#fff8e6" : "#ffffff"
+              }">
+                <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${
+                  row.RMPONo
+                }</td>
+                <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${
+                  row["Article Sub Category"]
+                }</td>
+                <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${
+                  row["Total PO Qty"]
+                }</td>
+                <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${
+                  row["Total Received Qty"]
+                }</td>
+                <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${
+                  row["Balance to Receive Qty"]
+                }</td>
+                <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${
+                  row["Ship to Location"]
+                }</td>
+              </tr>
+            `
+              )
+              .join("")}
+          </tbody>
+        </table>
+      `;
+    } else {
+      // PO + Article + Colour Code Level - Nested HTML Tables
+      dataToEmail.forEach((row) => {
         body += `
-        <tr>
-          <td colspan="6">
-            <strong>Article Details:</strong>
-            <table border="1" style="border-collapse: collapse; width: 100%;">
+          <div style="margin-bottom: 30px; font-family: Arial, sans-serif;">
+            <table style="width:100%; border-collapse: collapse; margin-bottom: 10px; background-color: #f0f2ff;">
+              <tr>
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd; background-color: #696fcf; color: white; width: 20%;">PO No:</th>
+                <td style="padding: 8px; text-align: left; border: 1px solid #ddd; font-weight: bold;">${row.RMPONo}</td>
+              </tr>
+              <tr>
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd; background-color: #696fcf; color: white;">Sub Category:</th>
+                <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${row["Article Sub Category"]}</td>
+              </tr>
+              <tr>
+                <th style="padding: 8px; text-align: left; border: 1px solid #ddd; background-color: #696fcf; color: white;">Ship to Location:</th>
+                <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${row["Ship to Location"]}</td>
+              </tr>
+            </table>
+        `;
+
+        if (row.articles && row.articles.length) {
+          body += `
+            <h4 style="margin: 12px 0 8px 0; color: #696fcf;">Article Details</h4>
+            <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
               <thead>
-                <tr>
-                  <th>Article Code</th>
-                  <th>Article Name</th>
-                  <th>Color Name</th>
-                  <th>Color Code</th>
-                  <th>Ordered Qty</th>
-                  <th>Received Qty</th>
-                  <th>Invoice</th>
-                  <th>Qty</th>
+                <tr style="background-color: #e0dbff;">
+                  <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Article Code</th>
+                  <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Article Name</th>
+                  <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Color</th>
+                  <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Ordered</th>
+                  <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Received</th>
+                  <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Balance</th>
+                  ${
+                    row.articles.some((a) => a["Billing Doc. No"])
+                      ? '<th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Invoice</th>'
+                      : ""
+                  }
                 </tr>
               </thead>
               <tbody>
-      `;
-
-        row.articles.forEach((article) => {
-          body += `
-          <tr>
-            <td>${article["Article Code"]}</td>
-            <td>${article["Article Name"]}</td>
-            <td>${article["Color Name"]}</td>
-            <td>${article["Color Code"]}</td>
-            <td>${article["PO Qty(Purchase UOM)"]}</td>
-            <td>${article["Received Qty"]}</td>
-            <td>${article["Billing Doc. No"] || "N/A"}</td>
-            <td>${article["Qty"] || "N/A"}</td>
-          </tr>
-        `;
-        });
-
-        body += `
+                ${row.articles
+                  .map(
+                    (article, idx) => `
+                  <tr style="background-color: ${
+                    idx % 2 === 0 ? "#ffffff" : "#f9f9ff"
+                  };">
+                    <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                      article["Article Code"]
+                    }</td>
+                    <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                      article["Article Name"]
+                    }</td>
+                    <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                      article["Color Name"]
+                    } (${article["Color Code"]})</td>
+                    <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                      article["PO Qty(Purchase UOM)"]
+                    }</td>
+                    <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                      article["Received Qty"]
+                    }</td>
+                    <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                      article["Balance to Receive Qty"]
+                    }</td>
+                    ${
+                      article["Billing Doc. No"]
+                        ? `<td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${article["Billing Doc. No"]} (${article["Qty"]})</td>`
+                        : ""
+                    }
+                  </tr>
+                `
+                  )
+                  .join("")}
               </tbody>
             </table>
-          </td>
-        </tr>
-      `;
-      }
-    });
+          `;
+        }
 
-    body += `</tbody></table>`;
-    body += `<p>${template.closing}</p>`;
-    /*
-    let body = template.greeting + "\n\n";
-
-    dataToEmail.forEach((row) => {
-      body += `PO No: ${row.RMPONo}\n`;
-      body += `Sub Category: ${row["Article Sub Category"]}\n`;
-      body += `Total PO Qty: ${row["Total PO Qty"]}\n`;
-      body += `Total Received Qty: ${row["Total Received Qty"]}\n`;
-      body += `Balance to Receive Qty: ${row["Balance to Receive Qty"]}\n`;
-      body += `Ship to Location: ${row["Ship to Location"]}\n\n`;
-
-      if (row.articles && row.articles.length) {
-        body += "Article Details:\n";
-        row.articles.forEach((article, idx) => {
-          body += `${idx + 1}. Code: ${article["Article Code"]}, Name: ${
-            article["Article Name"]
-          }\n`;
-          body += `   Color: ${article["Color Name"]} (${article["Color Code"]})\n`;
-          body += `   Ordered: ${article["PO Qty(Purchase UOM)"]}, Received: ${article["Received Qty"]}\n`;
-          if (article["Billing Doc. No"]) {
-            body += `   Invoice: ${article["Billing Doc. No"]}, Qty: ${article["Qty"]}\n`;
-          }
-          body += "\n";
-        });
-      }
-
-      body += "------------------------\n\n";
-    });
+        body += `</div><hr style="border: 0; height: 1px; background-color: #ddd; margin: 20px 0;">`;
+      });
+    }
 
     body += template.closing;
-*/
+
     // Use the custom recipient if provided, otherwise use default
     const to = customRecipient || "sashini@coats.com";
     const cc = "sahansu@inqube.com";
-
-    // try {
-    //   // Method 1: Try mailto (works in most browsers with default mail client)
-    //   const mailtoLink = `mailto:${to}?cc=${cc}&subject=${encodeURIComponent(
-    //     subject
-    //   )}&body=${encodeURIComponent(body)}`;
-
-    //   window.location.href = mailtoLink;
-
-    //   // Create hidden anchor and click it (more reliable than window.open for mailto)
-    //   const link = document.createElement("a");
-    //   link.href = mailtoLink;
-    //   link.style.display = "none";
-    //   document.body.appendChild(link);
-    //   link.click();
-    //   document.body.removeChild(link);
-
-    //   // Close modal
-    //   setShowEmailModal(false);
-    // } catch (error) {
-    //   console.error("Failed to open email client:", error);
-    //   alert(
-    //     "Could not open your email client automatically. Please copy the email details and send manually."
-    //   );
-    //}
     const mailtoLink = `mailto:${to}?cc=${cc}&subject=${encodeURIComponent(
       subject
-    )}&body=${encodeURIComponent(body)}`;
-
-    // Open desktop Outlook
+    )}&body=${encodeURIComponent(body)}&html=true`;
     window.location.href = mailtoLink;
-    // Close modal
     setShowEmailModal(false);
   };
 
@@ -301,15 +332,19 @@ const DataGrid = ({ data, allowSelection = true }) => {
     setActiveFilter(null);
   };
 
-  const filteredData = groupedData.filter((row) => {
-    return (
-      row.RMPONo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (row["Invoice No"] &&
-        row["Invoice No"].some((invoice) =>
-          String(invoice).toLowerCase().includes(searchTerm.toLowerCase())
-        ))
-    );
-  });
+  const filteredData = showOnlyPriority
+    ? groupedData.filter((row) =>
+        priorityPOs.some((po) => po.RMPONo === row.RMPONo)
+      )
+    : groupedData.filter((row) => {
+        return (
+          row.RMPONo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (row["Invoice No"] &&
+            row["Invoice No"].some((invoice) =>
+              String(invoice).toLowerCase().includes(searchTerm.toLowerCase())
+            ))
+        );
+      });
 
   // Filter data based on all active filters
   const filteredDataWithFilters = filteredData.filter((row) => {
@@ -358,6 +393,7 @@ const DataGrid = ({ data, allowSelection = true }) => {
     const selectedPOs = groupedData.filter((row) => selectedRows[row.RMPONo]);
     if (selectedPOs.length > 0) {
       addToPriority(selectedPOs);
+      //console.log("Selected POs:", selectedPOs);
       // Clear selections after adding
       setSelectedRows({});
     }
@@ -367,6 +403,7 @@ const DataGrid = ({ data, allowSelection = true }) => {
     const selectedPOs = groupedData.filter((row) => selectedRows[row.RMPONo]);
     if (selectedPOs.length > 0) {
       removeFromPriority(selectedPOs);
+
       // Clear selections after removing
       setSelectedRows({});
     }
@@ -374,6 +411,15 @@ const DataGrid = ({ data, allowSelection = true }) => {
 
   const toggleRow = (poNo) => {
     setExpandedPO(expandedPO === poNo ? null : poNo);
+  };
+
+  // Returns true if ALL selected rows are already prioritized
+  const allSelectedArePriority = () => {
+    const selectedPOs = groupedData.filter((row) => selectedRows[row.RMPONo]);
+    return (
+      selectedPOs.length > 0 &&
+      selectedPOs.every((row) => isPriority(row.RMPONo))
+    );
   };
 
   // Function to get completion percentage
@@ -397,6 +443,8 @@ const DataGrid = ({ data, allowSelection = true }) => {
           "PO Qty(Purchase UOM)": article["PO Qty(Purchase UOM)"],
           "Received Qty": article["Received Qty"],
           "Balance to Receive Qty": article["Balance to Receive Qty"],
+          "Earliest PCD": article["Earliest PCD"],
+          "Earliest PSD": article["Earliest PSD"],
           invoices: [],
         };
       }
@@ -413,7 +461,7 @@ const DataGrid = ({ data, allowSelection = true }) => {
   };
 
   return (
-    <div className="pt-3 min-h-screen w-full">
+    <div className="p-5 min-h-screen w-full">
       {/* Search and Actions Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-5">
         <div className="relative w-full sm:w-2/3 max-w-xl">
@@ -430,25 +478,37 @@ const DataGrid = ({ data, allowSelection = true }) => {
         </div>
 
         <div className="flex gap-2">
-          {allowSelection && Object.values(selectedRows).some(Boolean) && (
-            <button
-              onClick={handleAddToPriority}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white py-2 px-4 rounded-lg hover:from-amber-600 hover:to-amber-700 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 w-full sm:w-auto justify-center text-xs"
-            >
-              <FaStar className="text-xs" />
-              <span>Add to Priority</span>
-            </button>
-          )}
-          {allowSelection && Object.values(selectedRows).some(Boolean) && (
-            <button
-              onClick={handleRemoveFromPriority}
-              className="flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white py-2 px-4 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 w-full sm:w-auto justify-center text-xs"
-            >
-              <FaTrash className="text-xs" />
-              <span>Remove from Priority</span>
-            </button>
-          )}
+          <label className="flex items-center gap-2 mb-2">
+            <input
+              type="checkbox"
+              checked={showOnlyPriority}
+              onChange={() => setShowOnlyPriority((prev) => !prev)}
+              className="form-checkbox h-4 w-4 text-amber-500"
+            />
+            <span className="text-sm text-gray-700">
+              Show only priority orders
+            </span>
+          </label>
 
+          {allowSelection &&
+            Object.values(selectedRows).some(Boolean) &&
+            (allSelectedArePriority() ? (
+              <button
+                onClick={handleRemoveFromPriority}
+                className="flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white py-2 px-4 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 w-full sm:w-auto justify-center text-xs"
+              >
+                <FaTrash className="text-xs" />
+                <span>Remove from Priority</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleAddToPriority}
+                className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white py-2 px-4 rounded-lg hover:from-amber-600 hover:to-amber-700 transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 w-full sm:w-auto justify-center text-xs"
+              >
+                <FaStar className="text-xs" />
+                <span>Add to Priority</span>
+              </button>
+            ))}
           <button
             onClick={handleSendMail}
             className="flex items-center gap-1.5 bg-gradient-to-r from-[#9fa0ff] to-[#505bf9] text-white py-2 px-4 rounded-lg hover:from-[#8183f9] hover:to-[#696fcf] transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 w-full sm:w-auto justify-center text-xs"
@@ -551,6 +611,8 @@ const DataGrid = ({ data, allowSelection = true }) => {
                   <th className="py-2.5 px-3 text-left">Total Received</th>
                   <th className="py-2.5 px-3 text-left">Balance</th>
                   <th className="py-2.5 px-3 text-left">Invoice Qty</th>
+                  <th className="py-2.5 px-3 text-left">Earliest PCD</th>
+                  <th className="py-2.5 px-3 text-left">Earliest PSD</th>
                   <th className="py-2.5 px-3 text-left">Progress</th>
                 </tr>
               </thead>
@@ -622,6 +684,18 @@ const DataGrid = ({ data, allowSelection = true }) => {
 
                       <td className="py-2.5 px-3">{row["Qty"]}</td>
 
+                      <td className="py-2.5 px-3">
+                        {row["Earliest PCD"] &&
+                        !isNaN(new Date(row["Earliest PCD"]))
+                          ? new Date(row["Earliest PCD"]).toLocaleDateString()
+                          : "-"}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {row["Earliest PSD"] &&
+                        !isNaN(new Date(row["Earliest PSD"]))
+                          ? new Date(row["Earliest PSD"]).toLocaleDateString()
+                          : "-"}
+                      </td>
                       <td className="py-2.5 px-3 text-right">
                         <div className="flex items-center  justify-end gap-2">
                           <div className="relative w-[40px] h-4 bg-gray-200 rounded-full text-center">
@@ -838,6 +912,12 @@ const DataGrid = ({ data, allowSelection = true }) => {
                                       <th className="p-2 text-center border-b border-[#e4d7ff]">
                                         Invoices Qty
                                       </th>
+                                      <th className="p-2 text-left border-b border-[#e4d7ff]">
+                                        Earliest PCD
+                                      </th>
+                                      <th className="p-2 text-left border-b border-[#e4d7ff]">
+                                        Earliest PSD
+                                      </th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -845,7 +925,7 @@ const DataGrid = ({ data, allowSelection = true }) => {
                                       (article, idx) => (
                                         <tr
                                           key={idx}
-                                          className="hover:bg-blue-50 transition-colors"
+                                          className="hover:bg-blue-50 transition-colors text-gray-700"
                                         >
                                           <td className="p-2 border-b text-left border-[#e4d7ff] font-medium">
                                             {article["Article Code"]}
@@ -933,6 +1013,26 @@ const DataGrid = ({ data, allowSelection = true }) => {
                                               )
                                             )}
                                           </td>
+                                          <td className="py-2.5 px-3">
+                                            {article["Earliest PCD"] &&
+                                            !isNaN(
+                                              new Date(article["Earliest PCD"])
+                                            )
+                                              ? new Date(
+                                                  article["Earliest PCD"]
+                                                ).toLocaleDateString()
+                                              : "-"}
+                                          </td>
+                                          <td className="py-2.5 px-3">
+                                            {article["Earliest PSD"] &&
+                                            !isNaN(
+                                              new Date(article["Earliest PSD"])
+                                            )
+                                              ? new Date(
+                                                  article["Earliest PSD"]
+                                                ).toLocaleDateString()
+                                              : "-"}
+                                          </td>
                                         </tr>
                                       )
                                     )}
@@ -993,8 +1093,27 @@ const DataGrid = ({ data, allowSelection = true }) => {
                   className="w-full border ring-0 outline-none focus:ring-0 border-gray-300 rounded-md  py-2 px-3 text-sm"
                 >
                   <option value="urgent">Urgent Request</option>
+                  <option value="delivery_change">
+                    Delivery Change Request
+                  </option>
                   <option value="regular">Regular Status Update</option>
                   <option value="followup">Follow-up on Late Orders</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-left text-gray-700 mb-1">
+                  Order Grouping Level
+                </label>
+                <select
+                  value={emailGrouping}
+                  onChange={(e) => setEmailGrouping(e.target.value)}
+                  className="w-full border ring-0 outline-none focus:ring-0 border-gray-300 rounded-md py-2 px-3 text-sm mb-2"
+                >
+                  <option value="po">PO Level</option>
+                  <option value="po-article-color">
+                    PO + Article + Colour Code
+                  </option>
                 </select>
               </div>
 
@@ -1024,6 +1143,34 @@ const DataGrid = ({ data, allowSelection = true }) => {
                   <li>Full article details for each PO</li>
                   <li>Current quantities and status</li>
                 </ul>
+              </div>
+            </div>
+
+            <div>
+              <label className="block ml-6 text-sm font-medium text-left text-gray-700 mb-1">
+                Include Order Lines
+              </label>
+              <div className="flex gap-4 mb-2  ml-6 mt-2">
+                <label className="flex items-center text-sm">
+                  <input
+                    type="radio"
+                    name="pendingFilter"
+                    checked={!onlyPending}
+                    onChange={() => setOnlyPending(false)}
+                    className="mr-2"
+                  />
+                  All
+                </label>
+                <label className="flex items-center text-sm">
+                  <input
+                    type="radio"
+                    name="pendingFilter"
+                    checked={onlyPending}
+                    onChange={() => setOnlyPending(true)}
+                    className="mr-2"
+                  />
+                  Only Pending
+                </label>
               </div>
             </div>
 
@@ -1061,31 +1208,40 @@ const DataGrid = ({ data, allowSelection = true }) => {
 
                     let body = template.greeting + "\n\n";
 
-                    dataToEmail.forEach((row) => {
-                      body += `PO No: ${row.RMPONo}\n`;
-                      body += `Sub Category: ${row["Article Sub Category"]}\n`;
-                      body += `Total PO Qty: ${row["Total PO Qty"]}\n`;
-                      body += `Total Received Qty: ${row["Total Received Qty"]}\n`;
-                      body += `Balance to Receive Qty: ${row["Balance to Receive Qty"]}\n`;
-                      body += `Ship to Location: ${row["Ship to Location"]}\n\n`;
-
-                      if (row.articles && row.articles.length) {
-                        body += "Article Details:\n";
-                        row.articles.forEach((article, idx) => {
-                          body += `${idx + 1}. Code: ${
-                            article["Article Code"]
-                          }, Name: ${article["Article Name"]}\n`;
-                          body += `   Color: ${article["Color Name"]} (${article["Color Code"]})\n`;
-                          body += `   Ordered: ${article["PO Qty(Purchase UOM)"]}, Received: ${article["Received Qty"]}\n`;
-                          if (article["Billing Doc. No"]) {
-                            body += `   Invoice: ${article["Billing Doc. No"]}, Qty: ${article["Qty"]}\n`;
-                          }
-                          body += "\n";
-                        });
-                      }
-
-                      body += "------------------------\n\n";
-                    });
+                    if (emailGrouping === "po") {
+                      // PO Level
+                      dataToEmail.forEach((row) => {
+                        body += `PO No: ${row.RMPONo}\n`;
+                        body += `Sub Category: ${row["Article Sub Category"]}\n`;
+                        body += `Total PO Qty: ${row["Total PO Qty"]}\n`;
+                        body += `Total Received Qty: ${row["Total Received Qty"]}\n`;
+                        body += `Balance to Receive Qty: ${row["Balance to Receive Qty"]}\n`;
+                        body += `Ship to Location: ${row["Ship to Location"]}\n\n`;
+                        body += "------------------------\n\n";
+                      });
+                    } else {
+                      // PO + Article + Colour Code Level
+                      dataToEmail.forEach((row) => {
+                        body += `PO No: ${row.RMPONo}\n`;
+                        body += `Sub Category: ${row["Article Sub Category"]}\n`;
+                        body += `Ship to Location: ${row["Ship to Location"]}\n`;
+                        if (row.articles && row.articles.length) {
+                          body += "Article Details:\n";
+                          row.articles.forEach((article, idx) => {
+                            body += `${idx + 1}. Code: ${
+                              article["Article Code"]
+                            }, Name: ${article["Article Name"]}\n`;
+                            body += `   Color: ${article["Color Name"]} (${article["Color Code"]})\n`;
+                            body += `   Ordered: ${article["PO Qty(Purchase UOM)"]}, Received: ${article["Received Qty"]}\n`;
+                            if (article["Billing Doc. No"]) {
+                              body += `   Invoice: ${article["Billing Doc. No"]}, Qty: ${article["Qty"]}\n`;
+                            }
+                            body += "\n";
+                          });
+                        }
+                        body += "------------------------\n\n";
+                      });
+                    }
 
                     body += template.closing;
 
@@ -1115,31 +1271,40 @@ const DataGrid = ({ data, allowSelection = true }) => {
 
                     let body = template.greeting + "\n\n";
 
-                    dataToEmail.forEach((row) => {
-                      body += `PO No: ${row.RMPONo}\n`;
-                      body += `Sub Category: ${row["Article Sub Category"]}\n`;
-                      body += `Total PO Qty: ${row["Total PO Qty"]}\n`;
-                      body += `Total Received Qty: ${row["Total Received Qty"]}\n`;
-                      body += `Balance to Receive Qty: ${row["Balance to Receive Qty"]}\n`;
-                      body += `Ship to Location: ${row["Ship to Location"]}\n\n`;
-
-                      if (row.articles && row.articles.length) {
-                        body += "Article Details:\n";
-                        row.articles.forEach((article, idx) => {
-                          body += `${idx + 1}. Code: ${
-                            article["Article Code"]
-                          }, Name: ${article["Article Name"]}\n`;
-                          body += `   Color: ${article["Color Name"]} (${article["Color Code"]})\n`;
-                          body += `   Ordered: ${article["PO Qty(Purchase UOM)"]}, Received: ${article["Received Qty"]}\n`;
-                          if (article["Billing Doc. No"]) {
-                            body += `   Invoice: ${article["Billing Doc. No"]}, Qty: ${article["Qty"]}\n`;
-                          }
-                          body += "\n";
-                        });
-                      }
-
-                      body += "------------------------\n\n";
-                    });
+                    if (emailGrouping === "po") {
+                      // PO Level
+                      dataToEmail.forEach((row) => {
+                        body += `PO No: ${row.RMPONo}\n`;
+                        body += `Sub Category: ${row["Article Sub Category"]}\n`;
+                        body += `Total PO Qty: ${row["Total PO Qty"]}\n`;
+                        body += `Total Received Qty: ${row["Total Received Qty"]}\n`;
+                        body += `Balance to Receive Qty: ${row["Balance to Receive Qty"]}\n`;
+                        body += `Ship to Location: ${row["Ship to Location"]}\n\n`;
+                        body += "------------------------\n\n";
+                      });
+                    } else {
+                      // PO + Article + Colour Code Level
+                      dataToEmail.forEach((row) => {
+                        body += `PO No: ${row.RMPONo}\n`;
+                        body += `Sub Category: ${row["Article Sub Category"]}\n`;
+                        body += `Ship to Location: ${row["Ship to Location"]}\n`;
+                        if (row.articles && row.articles.length) {
+                          body += "Article Details:\n";
+                          row.articles.forEach((article, idx) => {
+                            body += `${idx + 1}. Code: ${
+                              article["Article Code"]
+                            }, Name: ${article["Article Name"]}\n`;
+                            body += `   Color: ${article["Color Name"]} (${article["Color Code"]})\n`;
+                            body += `   Ordered: ${article["PO Qty(Purchase UOM)"]}, Received: ${article["Received Qty"]}\n`;
+                            if (article["Billing Doc. No"]) {
+                              body += `   Invoice: ${article["Billing Doc. No"]}, Qty: ${article["Qty"]}\n`;
+                            }
+                            body += "\n";
+                          });
+                        }
+                        body += "------------------------\n\n";
+                      });
+                    }
 
                     body += template.closing;
 
@@ -1159,6 +1324,7 @@ const DataGrid = ({ data, allowSelection = true }) => {
                     const template = EMAIL_TEMPLATES[selectedTemplate];
                     const subject = template.subject;
 
+                    // Get data to email
                     const dataToEmail = Object.values(selectedRows).some(
                       Boolean
                     )
@@ -1167,88 +1333,254 @@ const DataGrid = ({ data, allowSelection = true }) => {
                         )
                       : filteredDataWithFilters;
 
-                    let body = `<p>${template.greeting}</p>`;
-                    body += `<table border="1" style="border-collapse: collapse; width: 100%;">`;
-                    body += `
-    <thead>
-      <tr>
-        <th>PO No</th>
-        <th>Sub Category</th>
-        <th>Total PO Qty</th>
-        <th>Total Received Qty</th>
-        <th>Balance to Receive Qty</th>
-        <th>Ship to Location</th>
-      </tr>
-    </thead>
-    <tbody>
-  `;
+                    // Generate HTML content (same as in the main email function)
+                    let body = template.greeting + "<br><br>";
 
-                    dataToEmail.forEach((row) => {
+                    if (emailGrouping === "po") {
+                      // PO Level - HTML Table
                       body += `
-      <tr>
-        <td>${row.RMPONo}</td>
-        <td>${row["Article Sub Category"]}</td>
-        <td>${row["Total PO Qty"]}</td>
-        <td>${row["Total Received Qty"]}</td>
-        <td>${row["Balance to Receive Qty"]}</td>
-        <td>${row["Ship to Location"]}</td>
-      </tr>
-    `;
+                      <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; font-family: Arial, sans-serif;font-size: 12px;">
+                        <thead>
+                          <tr style="background-color: #696fcf; color: white;">
+                            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">PO No</th>
+                            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Sub Category</th>
+                            <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Total PO Qty</th>
+                            <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Received Qty</th>
+                            <th style="padding: 8px; text-align: right; border: 1px solid #ddd;">Balance</th>
+                            <th style="padding: 8px; text-align: left; border: 1px solid #ddd;">Ship to Location</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${dataToEmail
+                            .map(
+                              (row) => `
+                            <tr style="background-color: ${
+                              isPriority(row.RMPONo) ? "#fff8e6" : "#ffffff"
+                            }">
+                              <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${
+                                row.RMPONo
+                              }</td>
+                              <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${
+                                row["Article Sub Category"]
+                              }</td>
+                              <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${
+                                row["Total PO Qty"]
+                              }</td>
+                              <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${
+                                row["Total Received Qty"]
+                              }</td>
+                              <td style="padding: 8px; text-align: right; border: 1px solid #ddd;">${
+                                row["Balance to Receive Qty"]
+                              }</td>
+                              <td style="padding: 8px; text-align: left; border: 1px solid #ddd;">${
+                                row["Ship to Location"]
+                              }</td>
+                            </tr>
+                          `
+                            )
+                            .join("")}
+                        </tbody>
+                      </table>
+                    `;
+                    } else {
+                      // PO + Article + Colour Code Level - Nested HTML Tables
+                      // Flatten all articles from all POs
+                      let allArticles = [];
+                      dataToEmail.forEach((row) => {
+                        if (row.articles && row.articles.length) {
+                          row.articles.forEach((article) => {
+                            // Only include if not onlyPending, or if onlyPending and balance > 0
+                            if (
+                              !onlyPending ||
+                              article["Balance to Receive Qty"] > 0
+                            ) {
+                              allArticles.push({
+                                poNo: row.RMPONo,
+                                shipTo: row["Ship to Location"],
+                                articleCode: article["Article Code"],
+                                articleName: article["Article Name"],
+                                color: `${article["Color Name"]} (${article["Color Code"]})`,
+                                ordered: article["PO Qty(Purchase UOM)"],
+                                received: article["Received Qty"],
+                                balance: article["Balance to Receive Qty"],
+                                invoice: article["Billing Doc. No"]
+                                  ? `${article["Billing Doc. No"]} (${article["Qty"]})`
+                                  : "",
+                              });
+                            }
+                          });
+                        }
+                      });
 
-                      if (row.articles && row.articles.length) {
-                        body += `
-        <tr>
-          <td colspan="6">
-            <strong>Article Details:</strong>
-            <table border="1" style="border-collapse: collapse; width: 100%;">
-              <thead>
-                <tr>
-                  <th>Article Code</th>
-                  <th>Article Name</th>
-                  <th>Color Name</th>
-                  <th>Color Code</th>
-                  <th>Ordered Qty</th>
-                  <th>Received Qty</th>
-                  <th>Invoice</th>
-                  <th>Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-      `;
+                      body += `
+                        <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; font-family: Arial, sans-serif; font-size: 12px;">
+                          <thead>
+                            <tr style="background-color: #e0dbff;">
+                              <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">PO No</th>
+                              <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Ship to Location</th>
+                              <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Article Code</th>
+                              <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Article Name</th>
+                              <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Color</th>
+                              <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Ordered</th>
+                              <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Received</th>
+                              <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Balance</th>
+                              <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Invoice</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${allArticles
+                              .map(
+                                (a, idx) => `
+                              <tr style="background-color: ${
+                                idx % 2 === 0 ? "#ffffff" : "#f9f9ff"
+                              };">
+                                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                                  a.poNo
+                                }</td>
+                                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                                  a.shipTo
+                                }</td>
+                                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                                  a.articleCode
+                                }</td>
+                                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                                  a.articleName
+                                }</td>
+                                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                                  a.color
+                                }</td>
+                                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                                  a.ordered
+                                }</td>
+                                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                                  a.received
+                                }</td>
+                                <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                                  a.balance
+                                }</td>
+                                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                                  a.invoice
+                                }</td>
+                              </tr>
+                            `
+                              )
+                              .join("")}
+                          </tbody>
+                        </table>
+                      `;
 
-                        row.articles.forEach((article) => {
-                          body += `
-          <tr>
-            <td>${article["Article Code"]}</td>
-            <td>${article["Article Name"]}</td>
-            <td>${article["Color Name"]}</td>
-            <td>${article["Color Code"]}</td>
-            <td>${article["PO Qty(Purchase UOM)"]}</td>
-            <td>${article["Received Qty"]}</td>
-            <td>${article["Billing Doc. No"] || "N/A"}</td>
-            <td>${article["Qty"] || "N/A"}</td>
-          </tr>
-        `;
-                        });
+                      // dataToEmail.forEach((row) => {
+                      //   body += `
+                      //   <div style="margin-bottom: 30px; font-family: Arial, sans-serif; font-size: 12px;">
+                      // `;
 
-                        body += `
-              </tbody>
-            </table>
-          </td>
-        </tr>
-      `;
-                      }
-                    });
+                      //   if (row.articles && row.articles.length) {
+                      //     body += `
+                      //     <h1 style="margin: 12px 0 8px 0; color: #696fcf;">Order Details</h4>
+                      //     <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+                      //       <thead>
+                      //         <tr style="background-color: #e0dbff;">
+                      //           <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">PO No</th>
+                      //           <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Ship to Location</th>
+                      //           <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Article Code</th>
+                      //           <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Article Name</th>
+                      //           <th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Color</th>
+                      //           <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Ordered</th>
+                      //           <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Received</th>
+                      //           <th style="padding: 6px; text-align: right; border: 1px solid #ddd;">Balance</th>
+                      //           ${
+                      //             row.articles.some((a) => a["Billing Doc. No"])
+                      //               ? '<th style="padding: 6px; text-align: left; border: 1px solid #ddd;">Invoice</th>'
+                      //               : ""
+                      //           }
+                      //         </tr>
+                      //       </thead>
+                      //       <tbody>
+                      //         ${row.articles
+                      //           .map(
+                      //             (article, idx) => `
+                      //           <tr style="background-color: ${
+                      //             idx % 2 === 0 ? "#ffffff" : "#f9f9ff"
+                      //           };">
 
-                    body += `</tbody></table>`;
-                    body += `<p>${template.closing}</p>`;
+                      //             <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                      //               row.RMPONo
+                      //             }</td>
+                      //              <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                      //                row["Ship to Location"]
+                      //              }</td>
+                      //             <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                      //               article["Article Code"]
+                      //             }</td>
+                      //             <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                      //               article["Article Name"]
+                      //             }</td>
+                      //             <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${
+                      //               article["Color Name"]
+                      //             } (${article["Color Code"]})</td>
+                      //             <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                      //               article["PO Qty(Purchase UOM)"]
+                      //             }</td>
+                      //             <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                      //               article["Received Qty"]
+                      //             }</td>
+                      //             <td style="padding: 6px; text-align: right; border: 1px solid #ddd;">${
+                      //               article["Balance to Receive Qty"]
+                      //             }</td>
+                      //             ${
+                      //               article["Billing Doc. No"]
+                      //                 ? `<td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${article["Billing Doc. No"]} (${article["Qty"]})</td>`
+                      //                 : ""
+                      //             }
+                      //           </tr>
+                      //         `
+                      //           )
+                      //           .join("")}
+                      //       </tbody>
+                      //     </table>
+                      //   `;
+                      //   }
 
-                    // Copy email details to clipboard
-                    const emailDetails = `To: ${customRecipient}\nCC: SahanSu@inqube.com\nSubject: ${subject}\n\n${body}`;
-                    navigator.clipboard.writeText(emailDetails);
-                    alert("Email details copied to clipboard!");
+                      //   body += `</div><hr style="border: 0; height: 1px; background-color: #ddd; margin: 20px 0; font-size: 12px;">`;
+                      // });
+                    }
+
+                    body += template.closing;
+
+                    // Create formatted email content for clipboard
+                    const emailDetails = `
+                    <div style="font-family: Arial, sans-serif;">
+                      <p><strong>To:</strong> ${
+                        customRecipient || "sashini@coats.com"
+                      }</p>
+                      <p><strong>CC:</strong> sahansu@inqube.com</p>
+                      <p><strong>Subject:</strong> ${subject}</p>
+                      <hr>
+                      <div>
+                        ${body}
+                      </div>
+                    </div>
+                  `;
+
+                    // Create a temporary textarea element to copy HTML content
+                    const tempElement = document.createElement("div");
+                    tempElement.innerHTML = emailDetails;
+                    document.body.appendChild(tempElement);
+
+                    // Copy to clipboard
+                    const range = document.createRange();
+                    range.selectNode(tempElement);
+                    window.getSelection().removeAllRanges();
+                    window.getSelection().addRange(range);
+                    document.execCommand("copy");
+                    window.getSelection().removeAllRanges();
+                    document.body.removeChild(tempElement);
+
+                    alert(
+                      "Email details copied to clipboard! Paste in an HTML-compatible editor to see formatting."
+                    );
+                    setShowEmailModal(false);
                   }}
-                  className="px-3 py-1.5 text-xs bg-gray-500 text-white rounded-md hover:bg-gray-600"
                 >
                   Copy to Clipboard
                 </button>
