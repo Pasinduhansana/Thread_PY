@@ -697,24 +697,26 @@ const DataGrid = ({ data, allowSelection = true }) => {
                           : "-"}
                       </td>
                       <td className="py-2.5 px-3 text-right">
-                        <div className="flex items-center  justify-end gap-2">
-                          <div className="relative w-[40px] h-4 bg-gray-200 rounded-full text-center">
-                            <div
-                              className="absolute w-full h-full bg-gradient-to-r from-[#64ed9d] to-[#1df18e] z-20  rounded-full"
-                              style={{
-                                width: `${getCompletionPercentage(
-                                  row["Qty"],
-                                  row["Total PO Qty"]
-                                )}%`,
-                              }}
-                            ></div>
-                            <span className="relative text-[11px] font-semibold z-50  text-gray-800">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 flex items-center">
+                            <span className="text-[11px] font-semibold text-gray-800 mr-1">
                               {getCompletionPercentage(
                                 row["Qty"],
                                 row["Total PO Qty"]
                               )}
                               %
                             </span>
+                            <div className="relative w-[60px] h-4 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="absolute h-full bg-gradient-to-r from-[#64ed9d] to-[#1df18e]"
+                                style={{
+                                  width: `${getCompletionPercentage(
+                                    row["Qty"],
+                                    row["Total PO Qty"]
+                                  )}%`,
+                                }}
+                              ></div>
+                            </div>
                           </div>
                         </div>
                       </td>

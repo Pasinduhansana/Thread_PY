@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import DataGrid from "../Components/Datagrid";
 import { PriorityContext } from "../Data/PriorityOrders";
 import { motion, AnimatePresence } from "framer-motion";
+import ReportCard from "../Components/ReportCard";
 import {
   FaFileUpload,
   FaChevronRight,
@@ -14,6 +15,10 @@ import {
   FaFileInvoice,
   FaFileAlt,
   FaDatabase,
+  FaTimes,
+  FaCog,
+  FaRegCalendarAlt,
+  FaBoxOpen,
 } from "react-icons/fa";
 import ExportModel from "../Components/ExportModel";
 import { apiUrl } from "../Data/config";
@@ -35,6 +40,9 @@ export default function Thread_Dashboard() {
   const [coatsorderbookFileName, setcoatsorderbookFileName] = useState(null);
   const [pcdLastUpdated, setPcdLastUpdated] = useState("");
   const [orderbookLastUpdated, setOrderbookLastUpdated] = useState("");
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [kpiLastUpdated, setKpiLastUpdated] = useState("");
+  const [invoiceLastUpdated, setInvoiceLastUpdated] = useState("");
 
   const handleExportClick = () => {
     setShowExportModal(true); // Open the export modal
@@ -83,6 +91,16 @@ export default function Thread_Dashboard() {
       }
     };
 
+    const fetchKpiLastUpdated = async () => {
+      try {
+        const response = await axios.get(`${apiUrl}/get_kpi_last_updated`);
+        setKpiLastUpdated(response.data.last_updated || "");
+      } catch (error) {
+        setKpiLastUpdated("");
+      }
+    };
+
+    fetchKpiLastUpdated();
     fetchOrderbookLastUpdated();
     fetchPcdLastUpdated();
     fetchSavedData();
@@ -272,199 +290,129 @@ export default function Thread_Dashboard() {
 
   return (
     <div className="flex h-screen w-full ">
-      {/* Side Menu Toggle Button */}
-      <div
-        className={`${
-          menuOpen ? "ml-64" : ""
-        } fixed top-0 left-0 z-20 transition-all duration-300`}
-      >
+      {/* Modal Prompt Button */}
+      <div className="fixed flex flex-row gap-2 top-20 right-[68px] z-30">
         <button
-          onClick={() => setMenuOpen(!menuOpen)}
-          className="bg-[#696fcf] mt-22 hover:bg-[#856ed2] text-white rounded-r-lg p-2 shadow-md flex items-center justify-center"
-          aria-label="Toggle menu"
+          onClick={() => setShowActionModal(true)}
+          className="flex items-center gap-1.5 bg-gradient-to-r from-[#9fa0ff] to-[#505bf9] text-white py-2 px-4 rounded-lg hover:from-[#8183f9] hover:to-[#696fcf] transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 w-full sm:w-auto justify-center text-xs"
         >
-          {menuOpen ? (
-            <FaChevronLeft size={14} />
-          ) : (
-            <FaChevronRight size={14} />
-          )}
+          <FaCog className="mr-1" /> Open Actions
         </button>
+        <motion.button
+          onClick={handleExportClick}
+          className="flex items-center gap-1.5 bg-gradient-to-r from-[#9fa0ff] to-[#505bf9] text-white py-2 px-4 rounded-lg hover:from-[#8183f9] hover:to-[#696fcf] transition-all duration-300 shadow-sm hover:shadow-md transform hover:-translate-y-0.5 w-full sm:w-auto justify-center text-xs"
+          whileTap={{ scale: 0.97 }}
+          whileHover={{
+            boxShadow: "0 4px 6px rgba(16, 185, 129, 0.5)",
+            y: -1,
+          }}
+          disabled={isLoading || !data.length}
+        >
+          {isLoading ? (
+            <FaSync className="animate-spin mr-2" />
+          ) : (
+            <FaDownload className="mr-2" />
+          )}
+          Export
+        </motion.button>
       </div>
 
-      {/* Side Menu Panel */}
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: menuOpen ? 256 : 0 }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="fixed left-0 top-0 h-full bg-white shadow-lg z-10 overflow-hidden"
-      >
-        <div className="p-4 h-full">
-          <h2 className="text-lg font-medium text-gray-800 mb-6 flex items-center gap-2">
-            <FaFileUpload /> Upload Reports
-          </h2>
+      {/* Modal Prompt for Actions */}
+      {showActionModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl mx-4 relative">
+            <button
+              onClick={() => setShowActionModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700"
+              aria-label="Close"
+            >
+              <FaTimes size={20} />
+            </button>
+            <div className="p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-6 flex items-center gap-2">
+                <FaFileUpload /> Upload & Actions
+              </h2>
 
-          <div className="space-y-4">
-            {/* KPI Report Upload */}
-            <div className="space-y-2">
-              <label className="block text-xs font-medium text-gray-700">
-                KPI Report
-              </label>
-              <div
-                {...getKpiRootProps()}
-                className="border-2 border-dashed border-[#bbadff] rounded-lg p-3 bg-[#f4f3f5] hover:bg-[#f5f0f9]  transition-colors cursor-pointer"
-              >
-                <input {...getKpiInputProps()} />
-                <div className="flex flex-col items-center justify-center text-center">
-                  <FaFileAlt className="text-[#7851dc] text-lg mb-1" />
-                  <p className="text-xs text-[#7851dc] font-medium truncate w-full">
-                    {kpiFileName ? kpiFileName : "Drop KPI Report"}
-                  </p>
-                  {kpiFileName && (
-                    <p className="text-[9px] text-green-600 mt-1">
-                      File uploaded
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+              {/* Reports Upload Section */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                {/* KPI Report */}
+                <ReportCard
+                  title="KPI Report"
+                  description="Upload KPI metrics for data analysis"
+                  fileName={kpiFileName}
+                  lastUpdated={kpiLastUpdated}
+                  rootProps={getKpiRootProps}
+                  inputProps={getKpiInputProps}
+                  icon={<FaFileAlt />}
+                  color="blue"
+                  isLoading={isLoading}
+                />
+                {/* Invoice Report */}
+                <ReportCard
+                  title="Invoice Report"
+                  description="Upload invoice data for billing tracking"
+                  fileName={invoiceFileName}
+                  lastUpdated={kpiLastUpdated}
+                  rootProps={getInvoiceRootProps}
+                  inputProps={getInvoiceInputProps}
+                  icon={<FaFileInvoice />}
+                  color="green"
+                  isLoading={isLoading}
+                />
 
-            {/* Invoice Report Upload */}
-            <div className="space-y-2">
-              <label className="block text-xs font-medium text-gray-700">
-                Invoice Report
-              </label>
-              <div
-                {...getInvoiceRootProps()}
-                className="border-2 border-dashed border-[#bbadff] rounded-lg p-3 bg-[#f4f3f5] hover:bg-[#f5f0f9] transition-colors cursor-pointer"
-              >
-                <input {...getInvoiceInputProps()} />
-                <div className="flex flex-col items-center justify-center text-center">
-                  <FaFileInvoice className="text-[#7851dc] text-lg mb-1" />
-                  <p className="text-xs text-[#7851dc] font-medium truncate w-full">
-                    {invoiceFileName ? invoiceFileName : "Drop Invoice Report"}
-                  </p>
-                  {invoiceFileName && (
-                    <p className="text-[9px] text-green-600 mt-1">
-                      File uploaded
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+                {/* PCD Report */}
+                <ReportCard
+                  title="PCD Update"
+                  description="Update Product Completion Dates"
+                  fileName={pcdFileName}
+                  lastUpdated={pcdLastUpdated}
+                  rootProps={getPcdRootProps}
+                  inputProps={getPcdInputProps}
+                  handleUpload={handleUploadPcd}
+                  icon={<FaRegCalendarAlt />}
+                  color="purple"
+                  isLoading={isLoading}
+                />
 
-            {/* PCD Report Upload */}
-            <div className="space-y-2 mt-6">
-              <label className="block text-xs font-medium text-gray-700">
-                PCD Update
-              </label>
-              <div
-                {...getPcdRootProps()}
-                className="border-2 border-dashed border-[#bbadff] rounded-lg p-3 bg-[#f4f3f5] hover:bg-[#f5f0f9] transition-colors cursor-pointer"
-              >
-                <input {...getPcdInputProps()} />
-                <div className="flex flex-col items-center justify-center text-center">
-                  <p className="text-xs text-[#7851dc] font-medium truncate w-full">
-                    {pcdFileName
-                      ? pcdFileName
-                      : "Drop or select PCD Update file"}
-                  </p>
-                </div>
+                {/* Coats Orderbook */}
+                <ReportCard
+                  title="Coats Orderbook"
+                  description="Upload orderbook data from Coats"
+                  fileName={coatsorderbookFileName}
+                  lastUpdated={orderbookLastUpdated}
+                  rootProps={getcoatsorderbookRootProps}
+                  inputProps={getcoatsorderbookInputProps}
+                  handleUpload={handleUploadOrderbook}
+                  icon={<FaBoxOpen />}
+                  color="amber"
+                  isLoading={isLoading}
+                />
               </div>
-              {pcdFileName && (
-                <button
-                  onClick={handleUploadPcd}
-                  className="mt-2 px-4 py-1 bg-[#7851dc] text-white rounded text-xs"
+
+              {/* Action Buttons */}
+              <div className="pt-4 space-y-2">
+                <motion.button
+                  onClick={Fetch_Data}
+                  className="w-full bg-gradient-to-r from-[#9fa0ff] to-[#696fcf] text-white text-sm py-4 px-6 rounded-lg shadow-md flex items-center justify-center gap-2 hover:from-[#8183f9] hover:to-[#696fcf]"
+                  whileTap={{ scale: 0.97 }}
+                  whileHover={{
+                    boxShadow: "0 4px 6px rgba(59, 130, 246, 0.5)",
+                    y: -1,
+                  }}
+                  disabled={isLoading}
                 >
-                  Upload PCD
-                </button>
-              )}
-              {pcdLastUpdated && (
-                <p className="text-[10px] text-green-600 mt-1">
-                  Last updated: {pcdLastUpdated}
-                </p>
-              )}
-            </div>
-
-            {/* Supplier Ex-Mill File Upload */}
-            <div className="space-y-2 mt-6">
-              <label className="block text-xs font-medium text-gray-700">
-                Coats Orderbook Update
-              </label>
-              <div
-                {...getcoatsorderbookRootProps()}
-                className="border-2 border-dashed border-[#bbadff] rounded-lg p-3 bg-[#f4f3f5] hover:bg-[#f5f0f9] transition-colors cursor-pointer"
-              >
-                <input {...getcoatsorderbookInputProps()} />
-                <div className="flex flex-col items-center justify-center text-center">
-                  <p className="text-xs text-[#7851dc] font-medium truncate w-full">
-                    {coatsorderbookFileName
-                      ? coatsorderbookFileName
-                      : "Drop or select Coats orderbook file"}
-                  </p>
-                </div>
+                  {isLoading ? (
+                    <FaSync className="animate-spin mr-2" />
+                  ) : (
+                    <FaDatabase className="mr-2" />
+                  )}
+                  Sync Data
+                </motion.button>
               </div>
-              {coatsorderbookFileName && (
-                <button
-                  onClick={handleUploadOrderbook}
-                  className="mt-2 px-4 py-1 bg-[#7851dc] text-white rounded text-xs"
-                >
-                  Upload Coats Orderbook
-                </button>
-              )}
-              {orderbookLastUpdated && (
-                <p className="text-[10px] text-green-600 mt-1">
-                  Last updated: {orderbookLastUpdated}
-                </p>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="pt-4 space-y-2">
-              <motion.button
-                onClick={Fetch_Data}
-                className="w-full bg-gradient-to-r from-[#9fa0ff] to-[#696fcf] text-white text-xs py-2 px-3 rounded-lg shadow-md flex items-center justify-center gap-2 hover:from-[#8183f9] hover:to-[#696fcf]"
-                whileTap={{ scale: 0.97 }}
-                whileHover={{
-                  boxShadow: "0 4px 6px rgba(59, 130, 246, 0.5)",
-                  y: -1,
-                }}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <div className="animate-spin">
-                    <FaSync className="h-3 w-3" />
-                  </div>
-                ) : (
-                  <>
-                    <FaDatabase className="h-3 w-3" /> Sync Data
-                  </>
-                )}
-              </motion.button>
-
-              <motion.button
-                onClick={handleExportClick}
-                className="w-full bg-gradient-to-br from-emerald-500 to-emerald-600 text-white text-xs py-2 px-3 rounded-lg shadow-md flex items-center justify-center gap-2 hover:from-emerald-600 hover:to-emerald-700"
-                whileTap={{ scale: 0.97 }}
-                whileHover={{
-                  boxShadow: "0 4px 6px rgba(16, 185, 129, 0.5)",
-                  y: -1,
-                }}
-                disabled={isLoading || !data.length}
-              >
-                {isLoading ? (
-                  <div className="animate-spin">
-                    <FaSync className="h-3 w-3" />
-                  </div>
-                ) : (
-                  <>
-                    <FaDownload className="h-3 w-3" /> Export to Excel
-                  </>
-                )}
-              </motion.button>
             </div>
           </div>
         </div>
-      </motion.div>
+      )}
 
       {/* Main Content Area */}
       <div
