@@ -52,7 +52,7 @@ import {
 import TimeSeriesChart from "../Components/TimeSeriesChart";
 import "chart.js/auto";
 
-const ARTICLE_CODES = ["5722160", "2925120", "F025160", "F025140", "57A3140"];
+const ARTICLE_CODES = ["EVF2140", "EV57120", "EV12160", "EVF2160", "EVS2140"];
 
 function getArticleKey(articleName) {
   if (!articleName) return "";
@@ -68,6 +68,7 @@ export default function ROP_Thread() {
   const [requirementFileName, setRequirementFileName] = useState("");
   const [requirementData, setRequirementData] = useState([]);
   const [requirementLastUpdated, setRequirementLastUpdated] = useState("");
+  const [selectedWarehouse, setSelectedWarehouse] = useState("All");
 
   const [inventoryFile, setInventoryFile] = useState(null);
   const [stockData, setStockData] = useState([]);
@@ -100,6 +101,11 @@ export default function ROP_Thread() {
     fetchStockData();
   }, []);
 
+  useEffect(() => {
+    fetchStockData();
+    fetchRequirementData();
+  }, [selectedWarehouse]);
+
   const fetchKPData = async () => {
     try {
       const response = await axios.get(`${apiUrl}/get_kpi_data`);
@@ -125,7 +131,15 @@ export default function ROP_Thread() {
   const fetchRequirementData = async () => {
     try {
       const response = await axios.get(`${apiUrl}/get_requirement_data`);
-      setRequirementData(response.data.requirement || []);
+    // Filter requirement data based on selected warehouse, or show all if "All" is selected
+    const filteredRequirementData = selectedWarehouse === "All"
+      ? response.data.requirement
+      : response.data.requirement.filter(
+          (item) => item["Warehouse"] === selectedWarehouse
+        );
+
+    setRequirementData(filteredRequirementData);
+
     } catch (error) {
       console.error("Error fetching requirement data:", error);
       setMessage({
@@ -178,8 +192,16 @@ export default function ROP_Thread() {
       const response = await axios.get(`${apiUrl}/get_inventory_data`);
 
       if (response.data && response.data.inventory) {
-        setStockData(response.data.inventory);
-
+        if (response.data && response.data.inventory) {
+          // Filter stock data based on selected warehouse, or show all if "All" is selected
+          const filteredStockData = selectedWarehouse === "All" 
+            ? response.data.inventory 
+            : response.data.inventory.filter(
+                (item) => item["Warehouse"] === selectedWarehouse
+              );
+    
+          setStockData(filteredStockData);
+            }
         // Group by article name
         const groups = {};
         response.data.inventory.forEach((item) => {
@@ -621,6 +643,16 @@ export default function ROP_Thread() {
             </div>
 
             <div className="flex gap-3">
+            <select
+              value={selectedWarehouse}
+              onChange={(e) => setSelectedWarehouse(e.target.value)}
+              className="text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+            >
+              <option value="All">All</option>
+              <option value="HORANA TRIMS WAREHOUSE">HORANA TRIMS WAREHOUSE</option>
+              <option value="MINUWANGODA TRIMS WAREHOUSE">MINUWANGODA TRIMS WAREHOUSE</option>
+              <option value="POLONNARUWA TRIMS WAREHOUSE">POLONNARUWA TRIMS WAREHOUSE</option>
+            </select>
               <motion.button
                 onClick={() => setModalOpen(true)}
                 className="  bg-gradient-to-r from-[#9fa0ff]/90 to-[#696fcf]/90 text-white text-sm py-2 px-4 rounded-lg shadow-md flex items-center justify-center gap-2 hover:from-[#8f91f6] hover:to-[#686fdc] transition-colors"
